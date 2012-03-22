@@ -64,7 +64,8 @@ def clear_data_home(data_home=None):
 
 
 def load_files(container_path, description=None, categories=None,
-               load_content=True, shuffle=True, random_state=0):
+               load_content=True, shuffle=True, charset=None,
+               charse_error='strict', random_state=0):
     """Load text files with categories as subfolder names.
 
     Individual samples are assumed to be files stored a two levels folder
@@ -115,6 +116,18 @@ def load_files(container_path, description=None, categories=None,
         in the data structure returned. If not, a filenames attribute
         gives the path to the files.
 
+    charset : string or None (default is None)
+        If None, do not try to decode the content of the files (e.g. for
+        images or other non-text content).
+        If not None, charset to use to decode text files if load_content is
+        True.
+
+    charset_error: {'strict', 'ignore', 'replace'}
+        Instruction on what to do if a byte sequence is given to analyze that
+        contains characters not of the given `charset`. By default, it is
+        'strict', meaning that a UnicodeDecodeError will be raised. Other
+        values are 'ignore' and 'replace'.
+
     shuffle : bool, optional (default=True)
         Whether or not to shuffle the data: might be important for models that
         make the assumption that the samples are independent and identically
@@ -126,8 +139,8 @@ def load_files(container_path, description=None, categories=None,
         If None, the random number generator is the RandomState instance used
         by `np.random`.
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object, the interesting attributes are: either
         data, the raw text data to learn, or 'filenames', the files
@@ -166,6 +179,8 @@ def load_files(container_path, description=None, categories=None,
 
     if load_content:
         data = [open(filename).read() for filename in filenames]
+        if charset is not None:
+            data = [d.decode(charset, charse_error) for d in data]
         return Bunch(data=data,
                      filenames=filenames,
                      target_names=target_names,
@@ -192,8 +207,8 @@ def load_iris():
     Features            real, positive
     =================   ==============
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object, the interesting attributes are:
         'data', the data to learn, 'target', the classification labels,
@@ -253,8 +268,8 @@ def load_digits(n_class=10):
     n_class : integer, between 0 and 10, optional (default=10)
         The number of classes to return.
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object, the interesting attributes are:
         'data', the data to learn, 'images', the images corresponding
@@ -266,14 +281,14 @@ def load_digits(n_class=10):
     --------
     To load the data and visualize the images::
 
-    >>> from sklearn.datasets import load_digits
-    >>> digits = load_digits()
-    >>> digits.data.shape
-    (1797, 64)
-    >>> # import pylab as pl
-    >>> # pl.gray()
-    >>> # pl.matshow(digits.images[0]) # Visualize the first image
-    >>> # pl.show()
+        >>> from sklearn.datasets import load_digits
+        >>> digits = load_digits()
+        >>> digits.data.shape
+        (1797, 64)
+        >>> import pylab as pl #doctest: +SKIP
+        >>> pl.gray() #doctest: +SKIP
+        >>> pl.matshow(digits.images[0]) #doctest: +SKIP
+        >>> pl.show() #doctest: +SKIP
     """
     module_path = dirname(__file__)
     data = np.loadtxt(join(module_path, 'data', 'digits.csv.gz'),
@@ -306,8 +321,8 @@ def load_diabetes():
     Targets             integer 25 - 346
     ==============      ==================
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object, the interesting attributes are:
         'data', the data to learn and 'target', the regression target for each
@@ -327,8 +342,8 @@ def load_linnerud():
     Features: integer
     Targets: integer
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object, the interesting attributes are: 'data' and
         'targets', the two multivariate datasets, with 'data' corresponding to
@@ -364,8 +379,8 @@ def load_boston():
     Targets             real 5. - 50.
     ==============     ==============
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object, the interesting attributes are:
         'data', the data to learn, 'target', the regression targets,
@@ -405,8 +420,8 @@ def load_sample_images():
     """Load sample images for image manipulation.
     Loads both, ``china`` and ``flower``.
 
-    Return
-    ------
+    Returns
+    -------
     data : Bunch
         Dictionary-like object with the following attributes :
         'images', the two sample images, 'filenames', the file
@@ -415,21 +430,17 @@ def load_sample_images():
 
     Examples
     --------
-    To load the data and visualize the images::
+    To load the data and visualize the images:
 
-    # >>> from sklearn.datasets import load_sample_images
-    # >>> dataset = load_sample_images()
-    # >>> len(dataset.images)
-    # 2
-    # >>> first_img_data = dataset.images[0]
-    # >>> first_img_data.shape
-    # (427, 640, 3)
-    # >>> first_img_data.dtype
-    # dtype('uint8')
-    # >>> import pylab as pl
-    # >>> pl.gray()
-    # >>> pl.matshow(dataset.images[0]) # Visualize the first image
-    # >>> pl.show()
+    >>> from sklearn.datasets import load_sample_images
+    >>> dataset = load_sample_images()     #doctest: +SKIP
+    >>> len(dataset.images)                #doctest: +SKIP
+    2
+    >>> first_img_data = dataset.images[0] #doctest: +SKIP
+    >>> first_img_data.shape               #doctest: +SKIP
+    (427, 640, 3)
+    >>> first_img_data.dtype               #doctest: +SKIP
+    dtype('uint8')
     """
     # Try to import imread from scipy. We do this lazily here to prevent
     # this module from depending on PIL.
@@ -439,7 +450,7 @@ def load_sample_images():
         except ImportError:
             from scipy.misc.pilutil import imread
     except ImportError:
-        raise ImportError("The Python Imaging Library (PIL)"
+        raise ImportError("The Python Imaging Library (PIL) "
                           "is required to load data from jpeg files")
     module_path = join(dirname(__file__), "images")
     with open(join(module_path, 'README.txt')) as f:
@@ -471,17 +482,17 @@ def load_sample_image(image_name):
     Examples
     ---------
 
-    # >>> from sklearn.datasets import load_sample_image
-    # >>> china = load_sample_image('china.jpg')
-    # >>> china.dtype
-    # dtype('uint8')
-    # >>> china.shape
-    # (427, 640, 3)
-    # >>> flower = load_sample_image('flower.jpg') # doctest: +SKIP
-    # >>> flower.dtype
-    # dtype('uint8')
-    # >>> flower.shape
-    # (427, 640, 3)
+    >>> from sklearn.datasets import load_sample_image
+    >>> china = load_sample_image('china.jpg')   # doctest: +SKIP
+    >>> china.dtype                              # doctest: +SKIP
+    dtype('uint8')
+    >>> china.shape                              # doctest: +SKIP
+    (427, 640, 3)
+    >>> flower = load_sample_image('flower.jpg') # doctest: +SKIP
+    >>> flower.dtype                             # doctest: +SKIP
+    dtype('uint8')
+    >>> flower.shape                             # doctest: +SKIP
+    (427, 640, 3)
     """
     images = load_sample_images()
     index = None

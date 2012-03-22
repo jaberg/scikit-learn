@@ -263,7 +263,7 @@ def fetch_lfw_people(data_home=None, funneled=True, resize=0.5,
 
     # wrap the loader in a memoizing function that will return memmaped data
     # arrays for optimal memory usage
-    m = Memory(cachedir=lfw_home, mmap_mode='c', verbose=0)
+    m = Memory(cachedir=lfw_home, compress=6, verbose=0)
     load_func = m.cache(_fetch_lfw_people)
 
     # load and memoize the pairs as np arrays
@@ -272,7 +272,8 @@ def fetch_lfw_people(data_home=None, funneled=True, resize=0.5,
         min_faces_per_person=min_faces_per_person, color=color, slice_=slice_)
 
     # pack the results as a Bunch instance
-    return Bunch(data=faces, target=target, target_names=target_names,
+    return Bunch(data=faces.reshape(len(faces), -1), images=faces,
+                 target=target, target_names=target_names,
                  DESCR="LFW faces dataset")
 
 
@@ -401,7 +402,7 @@ def fetch_lfw_pairs(subset='train', data_home=None, funneled=True, resize=0.5,
 
     # wrap the loader in a memoizing function that will return memmaped data
     # arrays for optimal memory usage
-    m = Memory(cachedir=lfw_home, mmap_mode='c', verbose=0)
+    m = Memory(cachedir=lfw_home, compress=6, verbose=0)
     load_func = m.cache(_fetch_lfw_pairs)
 
     # select the right metadata file according to the requested subset
@@ -421,7 +422,8 @@ def fetch_lfw_pairs(subset='train', data_home=None, funneled=True, resize=0.5,
         slice_=slice_)
 
     # pack the results as a Bunch instance
-    return Bunch(data=pairs, target=target, target_names=target_names,
+    return Bunch(data=pairs.reshape(len(pairs), -1), pairs=pairs,
+                 target=target, target_names=target_names,
                  DESCR="'%s' segment of the LFW pairs dataset" % subset)
 
 

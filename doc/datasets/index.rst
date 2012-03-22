@@ -1,11 +1,3 @@
-..
-    For doctests:
-
-    >>> import numpy as np
-    >>> import os
-    >>> from sklearn import datasets
-    >>> datasets.mldata.urllib2 = mock_urllib2
-
 .. _datasets:
 
 =========================
@@ -83,6 +75,9 @@ and pipeline on 2D data.
 
 .. autosummary::
 
+   :toctree: ../modules/generated/
+   :template: function.rst
+
    load_sample_images
    load_sample_image
 
@@ -124,6 +119,7 @@ can be used to build artifical datasets of controled size and complexity.
    :template: function.rst
 
    make_classification
+   make_multilabel_classification
    make_regression
    make_blobs
    make_friedman1
@@ -175,11 +171,11 @@ features::
  _`Faster API-compatible implementation`: https://github.com/mblondel/svmlight-loader
 
 
-.. include:: olivetti_faces.rst 
+.. include:: olivetti_faces.inc 
 
-.. include:: twenty_newsgroups.rst
+.. include:: twenty_newsgroups.inc
 
-.. include:: mldata.rst
+.. include:: mldata.inc
 
-.. include:: labeled_faces.rst
+.. include:: labeled_faces.inc
 

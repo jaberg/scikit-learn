@@ -12,7 +12,6 @@ is called with the same input arguments.
 from __future__ import with_statement
 import os
 import shutil
-import sys
 import time
 import pydoc
 try:
@@ -95,8 +94,10 @@ class MemorizedFunc(Logger):
         mmap_mode: {None, 'r+', 'r', 'w+', 'c'}
             The memmapping mode used when loading from cache
             numpy arrays. See numpy.load for the meaning of the
-            arguments. Only used if save_npy was true when the
-            cache was created.
+            arguments.
+        compress: boolean
+            Whether to zip the stored data on disk. Note that compressed
+            arrays cannot be read by memmapping.
         verbose: int, optional
             The verbosity flag, controls messages that are issued as
             the function is revaluated.
@@ -105,8 +106,8 @@ class MemorizedFunc(Logger):
     # Public interface
     #-------------------------------------------------------------------------
 
-    def __init__(self, func, cachedir, ignore=None, save_npy=True,
-                             mmap_mode=None, verbose=1, timestamp=None):
+    def __init__(self, func, cachedir, ignore=None, mmap_mode=None,
+                 compress=False, verbose=1, timestamp=None):
         """
             Parameters
             ----------
@@ -116,14 +117,10 @@ class MemorizedFunc(Logger):
                 The path of the base directory to use as a data store
             ignore: list or None
                 List of variable names to ignore.
-            save_npy: boolean, optional
-                If True, numpy arrays are saved outside of the pickle
-                files in the cache, as npy files.
             mmap_mode: {None, 'r+', 'r', 'w+', 'c'}, optional
                 The memmapping mode used when loading from cache
                 numpy arrays. See numpy.load for the meaning of the
-                arguments. Only used if save_npy was true when the
-                cache was created.
+                arguments.
             verbose: int, optional
                 Verbosity flag, controls the debug messages that are issued
                 as functions are revaluated. The higher, the more verbose
@@ -135,8 +132,11 @@ class MemorizedFunc(Logger):
         self._verbose = verbose
         self.cachedir = cachedir
         self.func = func
-        self.save_npy = save_npy
         self.mmap_mode = mmap_mode
+        self.compress = compress
+        if compress and mmap_mode is not None:
+            warnings.warn('Compressed results cannot be memmapped',
+                          stacklevel=2)
         if timestamp is None:
             timestamp = time.time()
         self.timestamp = timestamp
@@ -189,7 +189,7 @@ class MemorizedFunc(Logger):
             In addition, when unpickling, we run the __init__
         """
         return (self.__class__, (self.func, self.cachedir, self.ignore,
-                self.save_npy, self.mmap_mode, self._verbose))
+                self.mmap_mode, self.compress, self._verbose))
 
     #-------------------------------------------------------------------------
     # Private interface
@@ -214,7 +214,7 @@ class MemorizedFunc(Logger):
         """
         coerce_mmap = (self.mmap_mode is not None)
         argument_hash = hash(filter_args(self.func, self.ignore,
-                             *args, **kwargs),
+                             args, kwargs),
                              coerce_mmap=coerce_mmap)
         output_dir = os.path.join(self._get_func_dir(self.func),
                                   argument_hash)
@@ -367,12 +367,7 @@ class MemorizedFunc(Logger):
         try:
             mkdirp(dir)
             filename = os.path.join(dir, 'output.pkl')
-
-            if 'numpy' in sys.modules and self.save_npy:
-                numpy_pickle.dump(output, filename)
-            else:
-                with open(filename, 'w') as output_file:
-                    pickle.dump(output, output_file, protocol=2)
+            numpy_pickle.dump(output, filename, compress=self.compress)
         except OSError:
             " Race condition in the creation of the directory "
 
@@ -381,7 +376,7 @@ class MemorizedFunc(Logger):
             output directory.
         """
         argument_dict = filter_args(self.func, self.ignore,
-                                    *args, **kwargs)
+                                    args, kwargs)
 
         input_repr = dict((k, repr(v)) for k, v in argument_dict.iteritems())
         if json is not None:
@@ -408,12 +403,8 @@ class MemorizedFunc(Logger):
                                     self.format_signature(self.func)[0]
                                     )
         filename = os.path.join(output_dir, 'output.pkl')
-        if self.save_npy:
-            return numpy_pickle.load(filename,
-                                     mmap_mode=self.mmap_mode)
-        else:
-            output_file = file(filename, 'r')
-            return pickle.load(output_file)
+        return numpy_pickle.load(filename,
+                                 mmap_mode=self.mmap_mode)
 
     # XXX: Need a method to check if results are available.
 
@@ -445,8 +436,7 @@ class Memory(Logger):
     # Public interface
     #-------------------------------------------------------------------------
 
-    def __init__(self, cachedir, save_npy=True, mmap_mode=None,
-                       verbose=1):
+    def __init__(self, cachedir, mmap_mode=None, compress=False, verbose=1):
         """
             Parameters
             ----------
@@ -454,14 +444,13 @@ class Memory(Logger):
                 The path of the base directory to use as a data store
                 or None. If None is given, no caching is done and
                 the Memory object is completely transparent.
-            save_npy: boolean, optional
-                If True, numpy arrays are saved outside of the pickle
-                files in the cache, as npy files.
             mmap_mode: {None, 'r+', 'r', 'w+', 'c'}, optional
                 The memmapping mode used when loading from cache
                 numpy arrays. See numpy.load for the meaning of the
-                arguments. Only used if save_npy was true when the
-                cache was created.
+                arguments.
+            compress: boolean
+                Whether to zip the stored data on disk. Note that
+                compressed arrays cannot be read by memmapping.
             verbose: int, optional
                 Verbosity flag, controls the debug messages that are issued
                 as functions are revaluated.
@@ -469,9 +458,12 @@ class Memory(Logger):
         # XXX: Bad explaination of the None value of cachedir
         Logger.__init__(self)
         self._verbose = verbose
-        self.save_npy = save_npy
         self.mmap_mode = mmap_mode
         self.timestamp = time.time()
+        self.compress = compress
+        if compress and mmap_mode is not None:
+            warnings.warn('Compressed results cannot be memmapped',
+                          stacklevel=2)
         if cachedir is None:
             self.cachedir = None
         else:
@@ -518,9 +510,9 @@ class Memory(Logger):
         if isinstance(func, MemorizedFunc):
             func = func.func
         return MemorizedFunc(func, cachedir=self.cachedir,
-                                   save_npy=self.save_npy,
                                    mmap_mode=mmap_mode,
                                    ignore=ignore,
+                                   compress=self.compress,
                                    verbose=verbose,
                                    timestamp=self.timestamp)
 
@@ -560,5 +552,6 @@ class Memory(Logger):
             In addition, when unpickling, we run the __init__
         """
         # We need to remove 'joblib' from the end of cachedir
-        return (self.__class__, (self.cachedir[:-7],
-                self.save_npy, self.mmap_mode, self._verbose))
+        cachedir = self.cachedir[:-7] if self.cachedir is not None else None
+        return (self.__class__, (cachedir,
+                self.mmap_mode, self.compress, self._verbose))

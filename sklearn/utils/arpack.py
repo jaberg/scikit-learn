@@ -1154,12 +1154,6 @@ def eigs(A, k=6, M=None, sigma=None, which='LM', v0=None,
     eigsh : eigenvalues and eigenvectors for symmetric matrix A
     svds : singular value decomposition for a matrix A
 
-    Notes
-    -----
-    This function is a wrapper to the ARPACK [1]_ SNEUPD, DNEUPD, CNEUPD,
-    ZNEUPD, functions which use the Implicitly Restarted Arnoldi Method to
-    find the eigenvalues and eigenvectors [2]_.
-
     Examples
     --------
     Find 6 eigenvectors of the identity matrix:
@@ -1171,6 +1165,12 @@ def eigs(A, k=6, M=None, sigma=None, which='LM', v0=None,
     array([ 1.+0.j,  1.+0.j,  1.+0.j,  1.+0.j,  1.+0.j,  1.+0.j])
     >>> vecs.shape
     (13, 6)
+
+    Notes
+    -----
+    This function is a wrapper to the ARPACK [1]_ SNEUPD, DNEUPD, CNEUPD,
+    ZNEUPD, functions which use the Implicitly Restarted Arnoldi Method to
+    find the eigenvalues and eigenvectors [2]_.
 
     References
     ----------
@@ -1553,8 +1553,8 @@ def svds(A, k=6, ncv=None, tol=0):
     tol : float, optional
         Tolerance for singular values. Zero (default) means machine precision.
 
-    Note
-    ----
+    Notes
+    -----
     This is a naive implementation using an eigensolver on A.H * A or
     A * A.H, depending on which one is more efficient.
 

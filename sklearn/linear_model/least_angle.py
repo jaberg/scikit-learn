@@ -24,7 +24,11 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
               alpha_min=0, method='lar', copy_X=True,
               eps=np.finfo(np.float).eps,
               copy_Gram=True, verbose=False):
-    """Compute Least Angle Regression and LASSO path
+    """Compute Least Angle Regression and Lasso path
+
+    The optimization objective for Lasso is::
+
+    (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
 
     Parameters
     -----------
@@ -55,6 +59,12 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
         Cholesky diagonal factors. Increase this for very ill-conditioned
         systems.
 
+    copy_X: bool
+        If False, X is overwritten.
+
+    copy_Gram: bool
+        If False, Gram is overwritten.
+
     Returns
     --------
     alphas: array, shape: (max_features + 1,)
@@ -68,10 +78,12 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
 
     See also
     --------
-    :ref:`LassoLars`
-    :ref:`Lars`
-    decomposition.sparse_encode
-    decomposition.sparse_encode_parallel
+    lasso_path
+    LassoLars
+    Lars
+    LassoLarsCV
+    LarsCV
+    sklearn.decomposition.sparse_encode
 
     Notes
     ------
@@ -353,14 +365,12 @@ class Lars(LinearModel):
     >>> print clf.coef_ # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [ 0. -1.11...]
 
-    References
-    ----------
-    http://en.wikipedia.org/wiki/Least_angle_regression
-
     See also
     --------
-    lars_path, LassoLARS, LarsCV, LassoLarsCV
-    decomposition.sparse_encode, decomposition.sparse_encode_parallel
+    lars_path, LarsCV
+    sklearn.decomposition.sparse_encode
+
+    http://en.wikipedia.org/wiki/Least_angle_regression
     """
     def __init__(self, fit_intercept=True, verbose=False, normalize=True,
                  precompute='auto', n_nonzero_coefs=500,
@@ -435,7 +445,10 @@ class LassoLars(Lars):
     """Lasso model fit with Least Angle Regression a.k.a. Lars
 
     It is a Linear Model trained with an L1 prior as regularizer.
-    lasso).
+
+    The optimization objective for Lasso is::
+
+    (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
 
     Parameters
     ----------
@@ -488,13 +501,16 @@ class LassoLars(Lars):
     >>> print clf.coef_ # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [ 0.         -0.963257...]
 
-    References
-    ----------
-    http://en.wikipedia.org/wiki/Least_angle_regression
-
     See also
     --------
-    lars_path, Lasso
+    lars_path
+    lasso_path
+    Lasso
+    LassoCV
+    LassoLarsCV
+    sklearn.decomposition.sparse_encode
+
+    http://en.wikipedia.org/wiki/Least_angle_regression
     """
 
     def __init__(self, alpha=1.0, fit_intercept=True, verbose=False,
@@ -645,6 +661,10 @@ class LarsCV(LARS):
         see sklearn.cross_validation module. If None is passed, default to
         a 5-fold strategy
 
+    max_n_alphas : integer, optional
+        The maximum number of points on the path used to compute the
+        residuals in the cross-validation
+
     n_jobs : integer, optional
         Number of CPUs to use during the cross validation. If '-1', use
         all the CPUs
@@ -674,8 +694,9 @@ class LarsCV(LARS):
     method = 'lar'
 
     def __init__(self, fit_intercept=True, verbose=False, max_iter=500,
-                 normalize=True, precompute='auto', cv=None, n_jobs=1,
-                 eps=np.finfo(np.float).eps, copy_X=True):
+                 normalize=True, precompute='auto', cv=None,
+                 max_n_alphas=1000, n_jobs=1, eps=np.finfo(np.float).eps,
+                 copy_X=True):
         self.fit_intercept = fit_intercept
         self.max_iter = max_iter
         self.verbose = verbose
@@ -683,6 +704,7 @@ class LarsCV(LARS):
         self.precompute = precompute
         self.copy_X = copy_X
         self.cv = cv
+        self.max_n_alphas = max_n_alphas
         self.n_jobs = n_jobs
         self.eps = eps
 
@@ -719,15 +741,25 @@ class LarsCV(LARS):
                             max_iter=self.max_iter,
                             eps=self.eps)
                     for train, test in cv)
-        all_alphas = np.concatenate(zip(*cv_paths)[0])
-        all_alphas.sort()
+        all_alphas = np.concatenate(list(zip(*cv_paths))[0])
+        # Unique also sorts
+        all_alphas = np.unique(all_alphas)
+        # Take at most max_n_alphas values
+        stride = int(max(1, int(len(all_alphas) / float(self.max_n_alphas))))
+        all_alphas = all_alphas[::stride]
 
         mse_path = np.empty((len(all_alphas), len(cv_paths)))
         for index, (alphas, active, coefs, residues) in enumerate(cv_paths):
-            this_residues = interpolate.interp1d(alphas[::-1],
-                                                 residues[::-1],
-                                                 bounds_error=False,
-                                                 fill_value=residues.max(),
+            alphas = alphas[::-1]
+            residues = residues[::-1]
+            if alphas[0] != 0:
+                alphas = np.r_[0, alphas]
+                residues = np.r_[residues[0, np.newaxis], residues]
+            if alphas[-1] != all_alphas[-1]:
+                alphas = np.r_[alphas, all_alphas[-1]]
+                residues = np.r_[residues, residues[-1, np.newaxis]]
+            this_residues = interpolate.interp1d(alphas,
+                                                 residues,
                                                  axis=0)(all_alphas)
             this_residues **= 2
             mse_path[:, index] = np.mean(this_residues, axis=-1)
@@ -751,6 +783,10 @@ class LarsCV(LARS):
 
 class LassoLarsCV(LarsCV):
     """Cross-validated Lasso, using the LARS algorithm
+
+    The optimization objective for Lasso is::
+
+    (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
 
     Parameters
     ----------
@@ -776,6 +812,10 @@ class LassoLarsCV(LarsCV):
     cv : crossvalidation generator, optional
         see sklearn.cross_validation module. If None is passed, default to
         a 5-fold strategy
+
+    max_n_alphas : integer, optional
+        The maximum number of points on the path used to compute the
+        residuals in the cross-validation
 
     n_jobs : integer, optional
         Number of CPUs to use during the cross validation. If '-1', use
@@ -825,7 +865,7 @@ class LassoLarsCV(LarsCV):
 
     See also
     --------
-    lars_path, LassoLARS, LarsCV, LassoCV
+    lars_path, LassoLars, LarsCV, LassoCV
     """
 
     method = 'lasso'
@@ -833,6 +873,10 @@ class LassoLarsCV(LarsCV):
 
 class LassoLarsIC(LassoLars):
     """Lasso model fit with Lars using BIC or AIC for model selection
+
+    The optimization objective for Lasso is::
+
+    (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
 
     AIC is the Akaike information criterion and BIC is the Bayes
     Information criterion. Such criteria are useful to select the value
@@ -884,6 +928,9 @@ class LassoLarsIC(LassoLars):
     `intercept_` : float
         independent term in decision function.
 
+    `alpha_` : float
+        the alpha parameter chosen by the information criterion
+
     Examples
     --------
     >>> from sklearn import linear_model
@@ -896,8 +943,8 @@ class LassoLarsIC(LassoLars):
     >>> print clf.coef_ # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [ 0.  -1.11...]
 
-    References
-    ----------
+    Notes
+    -----
     The estimation of the number of degrees of freedom is given by:
 
     "On the degrees of freedom of the lasso"
@@ -972,7 +1019,7 @@ class LassoLarsIC(LassoLars):
 
         df = np.zeros(coef_path_.shape[1], dtype=np.int)  # Degrees of freedom
         for k, coef in enumerate(coef_path_.T):
-            mask = coef != 0
+            mask = np.abs(coef) > np.finfo(coef.dtype).eps
             if not np.any(mask):
                 continue
             # get the number of degrees of freedom equal to:

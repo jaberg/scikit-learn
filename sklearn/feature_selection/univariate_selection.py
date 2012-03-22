@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""
-Univariate features selection.
-"""
+"""Univariate features selection."""
 
 # Authors: V. Michel, B. Thirion, G. Varoquaux, A. Gramfort, E. Duchesnay.
 #          L. Buitinck
 # License: BSD 3 clause
+
+from abc import ABCMeta, abstractmethod
 
 import numpy as np
 from scipy import stats
@@ -13,7 +13,7 @@ from scipy.sparse import issparse
 
 from ..base import BaseEstimator, TransformerMixin
 from ..preprocessing import LabelBinarizer
-from ..utils import array2d, safe_asarray
+from ..utils import array2d, safe_asarray, deprecated
 from ..utils.extmath import safe_sparse_dot
 
 ######################################################################
@@ -24,10 +24,9 @@ from ..utils.extmath import safe_sparse_dot
 # Contrary to the scipy.stats.f_oneway implementation it does not
 # copy the data while keeping the inputs unchanged.
 def f_oneway(*args):
-    """
-    Performs a 1-way ANOVA.
+    """Performs a 1-way ANOVA.
 
-    The on-way ANOVA tests the null hypothesis that 2 or more groups have
+    The one-way ANOVA tests the null hypothesis that 2 or more groups have
     the same population mean.  The test is applied to samples from two or
     more groups, possibly with differing sizes.
 
@@ -50,20 +49,21 @@ def f_oneway(*args):
 
     1. The samples are independent
     2. Each sample is from a normally distributed population
-    3. The population standard deviations of the groups are all equal.  This
+    3. The population standard deviations of the groups are all equal. This
        property is known as homocedasticity.
 
     If these assumptions are not true for a given set of data, it may still be
     possible to use the Kruskal-Wallis H-test (`stats.kruskal`_) although with
-    some loss of power
+    some loss of power.
 
     The algorithm is from Heiman[2], pp.394-7.
 
-    See scipy.stats.f_oneway that should give the same results while
-    being less efficient
+    See ``scipy.stats.f_oneway`` that should give the same results while
+    being less efficient.
 
     References
     ----------
+
     .. [1] Lowry, Richard.  "Concepts and Applications of Inferential
            Statistics". Chapter 14.
            http://faculty.vassar.edu/lowry/ch14pt1.html
@@ -95,8 +95,7 @@ def f_oneway(*args):
 
 
 def f_classif(X, y):
-    """
-    Compute the Anova F-value for the provided sample
+    """Compute the Anova F-value for the provided sample
 
     Parameters
     ----------
@@ -139,9 +138,9 @@ def chi2(X, y):
     y : array-like, shape = n_samples
         Target vector (class labels).
 
-    Complexity
+    Notes
     ----------
-    O(n_classes * n_features) space.
+    Complexity of this algorithm is O(n_classes * n_features).
     """
 
     # XXX: we might want to do some of the following in logspace instead for
@@ -161,9 +160,11 @@ def chi2(X, y):
 
 
 def f_regression(X, y, center=True):
-    """
+    """Univariate linear regression tests
+
     Quick linear model for testing the effect of a single regressor,
-    sequentially for many regressors
+    sequentially for many regressors.
+
     This is done in 3 steps:
     1. the regressor of interest and the data are orthogonalized
     wrt constant regressors
@@ -211,8 +212,7 @@ def f_regression(X, y, center=True):
 # General class for filter univariate selection
 
 class _AbstractUnivariateFilter(BaseEstimator, TransformerMixin):
-    """ Abstract class, not meant to be used directly
-    """
+    __metaclass__ = ABCMeta
 
     def __init__(self, score_func):
         """ Initialize the univariate feature selection.
@@ -223,7 +223,8 @@ class _AbstractUnivariateFilter(BaseEstimator, TransformerMixin):
             function taking two arrays X and y, and returning 2 arrays:
             both scores and pvalues
         """
-        assert callable(score_func), ValueError(
+        if not callable(score_func):
+            raise TypeError(
                 "The score function should be a callable, '%s' (type %s) "
                 "was passed." % (score_func, type(score_func)))
         self.score_func = score_func
@@ -232,10 +233,22 @@ class _AbstractUnivariateFilter(BaseEstimator, TransformerMixin):
         """
         Evaluate the function
         """
-        _scores = self.score_func(X, y)
-        self._scores = _scores[0]
-        self._pvalues = _scores[1]
+        scores = self.score_func(X, y)
+        self.scores_ = scores[0]
+        self.pvalues_ = scores[1]
         return self
+
+    @property
+    @deprecated('``_scores`` is deprecated and will be removed in '
+                'version 0.12. Please use ``scores_`` instead.')
+    def _scores(self):
+        return self.scores_
+
+    @property
+    @deprecated('``_pvalues`` is deprecated and will be removed in '
+                'version 0.12. Please use ``scores_`` instead.')
+    def _pvalues(self):
+        return self.pvalues_
 
     def get_support(self, indices=False):
         """
@@ -243,6 +256,12 @@ class _AbstractUnivariateFilter(BaseEstimator, TransformerMixin):
         """
         mask = self._get_support_mask()
         return mask if not indices else np.where(mask)[0]
+
+    @abstractmethod
+    def _get_support_mask(self):
+        """
+        Must return a boolean mask indicating which features are selected.
+        """
 
     def transform(self, X):
         """
@@ -267,139 +286,138 @@ class _AbstractUnivariateFilter(BaseEstimator, TransformerMixin):
 ######################################################################
 
 class SelectPercentile(_AbstractUnivariateFilter):
-    """
-    Filter : Select the best percentile of the p_values
+    """Filter: Select the best percentile of the p_values
+
+    Parameters
+    ===========
+    score_func: callable
+        function taking two arrays X and y, and returning 2 arrays:
+        both scores and pvalues
+
+    percentile: int, optional
+        percent of features to keep
+
     """
 
     def __init__(self, score_func, percentile=10):
-        """ Initialize the univariate feature selection.
-
-        Parameters
-        ===========
-        score_func: callable
-            function taking two arrays X and y, and returning 2 arrays:
-            both scores and pvalues
-        percentile: int, optional
-            percent of features to keep
-        """
         self.percentile = percentile
         _AbstractUnivariateFilter.__init__(self, score_func)
 
     def _get_support_mask(self):
         percentile = self.percentile
-        assert percentile <= 100, ValueError('percentile should be \
-                            between 0 and 100 (%f given)' % (percentile))
+        if percentile > 100:
+            raise ValueError("percentile should be between 0 and 100"
+                             " (%f given)" % (percentile))
         # Cater for Nans
         if percentile == 100:
-            return np.ones(len(self._pvalues), dtype=np.bool)
+            return np.ones(len(self.pvalues_), dtype=np.bool)
         elif percentile == 0:
-            return np.zeros(len(self._pvalues), dtype=np.bool)
-        alpha = stats.scoreatpercentile(self._pvalues, percentile)
-        return (self._pvalues <= alpha)
+            return np.zeros(len(self.pvalues_), dtype=np.bool)
+        alpha = stats.scoreatpercentile(self.pvalues_, percentile)
+        return (self.pvalues_ <= alpha)
 
 
 class SelectKBest(_AbstractUnivariateFilter):
-    """
-    Filter : Select the k lowest p-values
+    """Filter: Select the k lowest p-values
+
+    Parameters
+    ===========
+    score_func: callable
+        function taking two arrays X and y, and returning 2 arrays:
+        both scores and pvalues
+
+    k: int, optional
+        Number of top feature to select.
+
     """
 
     def __init__(self, score_func, k=10):
-        """ Initialize the univariate feature selection.
-
-        Parameters
-        ===========
-        score_func: callable
-            function taking two arrays X and y, and returning 2 arrays:
-            both scores and pvalues
-        percentile: int, optional
-            percent of features to keep
-        """
         self.k = k
         _AbstractUnivariateFilter.__init__(self, score_func)
 
     def _get_support_mask(self):
         k = self.k
-        assert k <= len(self._pvalues), ValueError('cannot select %d features'
-                                    ' among %d ' % (k, len(self._pvalues)))
-        alpha = np.sort(self._pvalues)[k - 1]
-        return (self._pvalues <= alpha)
+        if k > len(self.pvalues_):
+            raise ValueError("cannot select %d features among %d"
+                             % (k, len(self.pvalues_)))
+        alpha = np.sort(self.pvalues_)[k - 1]
+        return (self.pvalues_ <= alpha)
 
 
 class SelectFpr(_AbstractUnivariateFilter):
-    """
-    Filter : Select the pvalues below alpha based on a FPR test: False
-    Positive Rate: controlling the total amount of false detections.
+    """Filter: Select the pvalues below alpha based on a FPR test.
+
+    FPR test stands for False Positive Rate test. It controls the total
+    amount of false detections.
+
+    Parameters
+    ===========
+    score_func: callable
+        function taking two arrays X and y, and returning 2 arrays:
+        both scores and pvalues
+
+    alpha: float, optional
+        the highest p-value for features to be kept
     """
 
     def __init__(self, score_func, alpha=5e-2):
-        """ Initialize the univariate feature selection.
-
-        Parameters
-        ===========
-        score_func: callable
-            function taking two arrays X and y, and returning 2 arrays:
-            both scores and pvalues
-        alpha: float, optional
-            the highest p-value for features to keep
-        """
         self.alpha = alpha
         _AbstractUnivariateFilter.__init__(self, score_func)
 
     def _get_support_mask(self):
         alpha = self.alpha
-        return (self._pvalues < alpha)
+        return self.pvalues_ < alpha
 
 
 class SelectFdr(_AbstractUnivariateFilter):
-    """
-    Filter : Select the p-values corresponding to an estimated false
-    discovery rate of alpha. This uses the Benjamini-Hochberg procedure
+    """Filter: Select the p-values for an estimated false discovery rate
+
+    This uses the Benjamini-Hochberg procedure. ``alpha`` is the target false
+    discorvery rate.
+
+    Parameters
+    ===========
+    score_func: callable
+        function taking two arrays X and y, and returning 2 arrays:
+        both scores and pvalues
+
+    alpha: float, optional
+        the highest uncorrected p-value for features to keep
+
     """
 
     def __init__(self, score_func, alpha=5e-2):
-        """ Initialize the univariate feature selection.
-
-        Parameters
-        ===========
-        score_func: callable
-            function taking two arrays X and y, and returning 2 arrays:
-            both scores and pvalues
-        alpha: float, optional
-            the highest uncorrected p-value for features to keep
-        """
         self.alpha = alpha
         _AbstractUnivariateFilter.__init__(self, score_func)
 
     def _get_support_mask(self):
         alpha = self.alpha
-        sv = np.sort(self._pvalues)
-        threshold = sv[sv < alpha * np.arange(len(self._pvalues))].max()
-        return (self._pvalues <= threshold)
+        sv = np.sort(self.pvalues_)
+        threshold = sv[sv < alpha * np.arange(len(self.pvalues_))].max()
+        return self.pvalues_ <= threshold
 
 
 class SelectFwe(_AbstractUnivariateFilter):
-    """
-    Filter : Select the p-values corresponding to Family-wise error rate: a
-    corrected p-value of alpha
+    """Filter: Select the p-values corresponding to Family-wise error rate
+
+    Parameters
+    ===========
+    score_func: callable
+        function taking two arrays X and y, and returning 2 arrays:
+        both scores and pvalues
+
+    alpha: float, optional
+        the highest uncorrected p-value for features to keep
+
     """
 
     def __init__(self, score_func, alpha=5e-2):
-        """ Initialize the univariate feature selection.
-
-        Parameters
-        ===========
-        score_func: callable
-            function taking two arrays X and y, and returning 2 arrays:
-            both scores and pvalues
-        alpha: float, optional
-            the highest uncorrected p-value for features to keep
-        """
         self.alpha = alpha
         _AbstractUnivariateFilter.__init__(self, score_func)
 
     def _get_support_mask(self):
         alpha = self.alpha
-        return (self._pvalues < alpha / len(self._pvalues))
+        return (self.pvalues_ < alpha / len(self.pvalues_))
 
 
 ######################################################################
@@ -407,6 +425,21 @@ class SelectFwe(_AbstractUnivariateFilter):
 ######################################################################
 
 class GenericUnivariateSelect(_AbstractUnivariateFilter):
+    """Univariate feature selector with configurable strategy
+
+    Parameters
+    ===========
+    score_func: callable
+        Function taking two arrays X and y, and returning 2 arrays:
+        both scores and pvalues
+
+    mode: {'percentile', 'k_best', 'fpr', 'fdr', 'fwe'}
+        Feature selection mode
+
+    param: float or int depending on the feature selection mode
+        Parameter of the corresponding mode
+    """
+
     _selection_modes = {'percentile':   SelectPercentile,
                         'k_best':       SelectKBest,
                         'fpr':          SelectFpr,
@@ -415,22 +448,12 @@ class GenericUnivariateSelect(_AbstractUnivariateFilter):
                         }
 
     def __init__(self, score_func, mode='percentile', param=1e-5):
-        """ Initialize the univariate feature selection.
-
-        Parameters
-        ===========
-        score_func: callable
-            Function taking two arrays X and y, and returning 2 arrays:
-            both scores and pvalues
-        mode: {%s}
-            Feature selection mode
-        param: float or int depending on the feature selection mode
-            Parameter of the corresponding mode
-        """ % self._selection_modes.keys()
-        assert callable(score_func), ValueError(
+        if not callable(score_func):
+            raise TypeError(
                 "The score function should be a callable, '%s' (type %s) "
                 "was passed." % (score_func, type(score_func)))
-        assert mode in self._selection_modes, ValueError(
+        if mode not in self._selection_modes:
+            raise ValueError(
                 "The mode passed should be one of %s, '%s', (type %s) "
                 "was passed." % (
                         self._selection_modes.keys(),
@@ -441,8 +464,8 @@ class GenericUnivariateSelect(_AbstractUnivariateFilter):
 
     def _get_support_mask(self):
         selector = self._selection_modes[self.mode](lambda x: x)
-        selector._pvalues = self._pvalues
-        selector._scores = self._scores
+        selector.pvalues_ = self.pvalues_
+        selector.scores_ = self.scores_
         # Now perform some acrobatics to set the right named parameter in
         # the selector
         possible_params = selector._get_param_names()

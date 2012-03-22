@@ -22,19 +22,35 @@ uses.
 
 **User guide:** See the :ref:`clustering` section for further details.
 
+Classes
+-------
 .. currentmodule:: sklearn
 
 .. autosummary::
    :toctree: generated/
    :template: class.rst
-
+    
+   cluster.AffinityPropagation
+   cluster.DBSCAN
    cluster.KMeans
    cluster.MiniBatchKMeans
    cluster.MeanShift
    cluster.SpectralClustering
-   cluster.AffinityPropagation
    cluster.Ward
 
+Functions
+---------
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   cluster.estimate_bandwidth
+   cluster.k_means
+   cluster.ward_tree
+   cluster.affinity_propagation
+   cluster.dbscan
+   cluster.mean_shift
+   cluster.spectral_clustering
 
 .. _covariance_ref:
 
@@ -59,6 +75,7 @@ uses.
    covariance.OAS
    covariance.GraphLasso
    covariance.GraphLassoCV
+   covariance.MinCovDet
 
 .. autosummary::
    :toctree: generated/
@@ -88,15 +105,24 @@ uses.
    :toctree: generated/
    :template: class.rst
 
-   cross_validation.LeaveOneOut
-   cross_validation.LeavePOut
-   cross_validation.KFold
-   cross_validation.StratifiedKFold
-   cross_validation.LeaveOneLabelOut
-   cross_validation.LeavePLabelOut
    cross_validation.Bootstrap
+   cross_validation.KFold
+   cross_validation.LeaveOneLabelOut
+   cross_validation.LeaveOneOut
+   cross_validation.LeavePLabelOut
+   cross_validation.LeavePOut
+   cross_validation.StratifiedKFold
    cross_validation.ShuffleSplit
+   cross_validation.StratifiedShuffleSplit
 
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   cross_validation.train_test_split
+   cross_validation.cross_val_score
+   cross_validation.permutation_test_score
+   cross_validation.check_cv
 
 .. _datasets_ref:
 
@@ -118,18 +144,23 @@ Loaders
    :toctree: generated/
    :template: function.rst
 
+   datasets.load_20newsgroups
+   datasets.fetch_20newsgroups
+   datasets.fetch_20newsgroups_vectorized
    datasets.load_boston
-   datasets.load_files
    datasets.load_diabetes
    datasets.load_digits
+   datasets.load_files
    datasets.load_iris
-   datasets.load_linnerud
    datasets.load_lfw_pairs
    datasets.fetch_lfw_pairs
    datasets.load_lfw_people
    datasets.fetch_lfw_people
-   datasets.load_20newsgroups
-   datasets.fetch_20newsgroups
+   datasets.load_linnerud
+   datasets.fetch_olivetti_faces
+   datasets.load_sample_image
+   datasets.load_sample_images
+   datasets.load_svmlight_file
 
 Samples generator
 -----------------
@@ -140,18 +171,22 @@ Samples generator
    :toctree: generated/
    :template: function.rst
 
-   datasets.make_classification
-   datasets.make_regression
    datasets.make_blobs
+   datasets.make_classification
+   datasets.make_circles
    datasets.make_friedman1
    datasets.make_friedman2
    datasets.make_friedman3
    datasets.make_low_rank_matrix
+   datasets.make_moons
+   datasets.make_multilabel_classification
+   datasets.make_regression
+   datasets.make_s_curve
    datasets.make_sparse_coded_signal
+   datasets.make_sparse_spd_matrix
    datasets.make_sparse_uncorrelated
    datasets.make_spd_matrix
    datasets.make_swiss_roll
-   datasets.make_s_curve
 
 
 .. _decomposition_ref:
@@ -180,6 +215,7 @@ Samples generator
    decomposition.NMF
    decomposition.SparsePCA
    decomposition.MiniBatchSparsePCA
+   decomposition.SparseCoder
    decomposition.DictionaryLearning
    decomposition.MiniBatchDictionaryLearning
 
@@ -191,7 +227,6 @@ Samples generator
    decomposition.dict_learning
    decomposition.dict_learning_online
    decomposition.sparse_encode
-   decomposition.sparse_encode_parallel
 
 
 .. _ensemble_ref:
@@ -234,6 +269,12 @@ Samples generator
 
 .. currentmodule:: sklearn
 
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   feature_extraction.DictVectorizer
+
 From images
 -----------
 
@@ -256,6 +297,8 @@ From images
 
    feature_extraction.image.PatchExtractor
 
+.. _text_feature_extraction_ref:
+
 From text
 ---------
 
@@ -269,12 +312,9 @@ From text
    :toctree: generated/
    :template: class.rst
 
-   feature_extraction.text.RomanPreprocessor
-   feature_extraction.text.WordNGramAnalyzer
-   feature_extraction.text.CharNGramAnalyzer
    feature_extraction.text.CountVectorizer
    feature_extraction.text.TfidfTransformer
-   feature_extraction.text.Vectorizer
+   feature_extraction.text.TfidfVectorizer
 
 
 .. _feature_selection_ref:
@@ -388,6 +428,45 @@ From text
    hmm.GMMHMM
 
 
+.. _kernel_approximation_ref:
+
+:mod:`sklearn.kernel_approximation` Kernel Approximation
+========================================================
+
+.. automodule:: sklearn.kernel_approximation
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`kernel_approximation` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   kernel_approximation.RBFSampler
+   kernel_approximation.AdditiveChi2Sampler
+   kernel_approximation.SkewedChi2Sampler
+
+:mod:`sklearn.semi_supervised` Semi-Supervised Learning
+========================================================
+
+.. automodule:: sklearn.semi_supervised
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`semi_supervised` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   semi_supervised.LabelPropagation
+   semi_supervised.LabelSpreading
+
 .. _lda_ref:
 
 :mod:`sklearn.lda`: Linear Discriminant Analysis
@@ -396,6 +475,8 @@ From text
 .. automodule:: sklearn.lda
    :no-members:
    :no-inherited-members:
+
+**User guide:** See the :ref:`lda_qda` section for further details.
 
 .. currentmodule:: sklearn
 
@@ -428,6 +509,7 @@ For dense data
 
    linear_model.LinearRegression
    linear_model.Ridge
+   linear_model.RidgeClassifier
    linear_model.RidgeCV
    linear_model.Lasso
    linear_model.LassoCV
@@ -440,10 +522,13 @@ For dense data
    linear_model.LassoLarsIC
    linear_model.LogisticRegression
    linear_model.OrthogonalMatchingPursuit
+   linear_model.Perceptron
    linear_model.SGDClassifier
    linear_model.SGDRegressor
    linear_model.BayesianRidge
    linear_model.ARDRegression
+   linear_model.RandomizedLasso
+   linear_model.RandomizedLogisticRegression
 
 .. autosummary::
    :toctree: generated/
@@ -453,6 +538,7 @@ For dense data
    linear_model.lars_path
    linear_model.orthogonal_mp
    linear_model.orthogonal_mp_gram
+   linear_model.lasso_stability_path
 
 For sparse data
 ---------------
@@ -473,7 +559,7 @@ For sparse data
    linear_model.sparse.ElasticNet
    linear_model.sparse.SGDClassifier
    linear_model.sparse.SGDRegressor
-   linear_model.sparse.LogisticRegression
+   linear_model.LogisticRegression
 
 
 .. _manifold_ref:
@@ -543,7 +629,7 @@ Regression metrics
    :template: function.rst
 
    metrics.r2_score
-   metrics.mean_square_error
+   metrics.mean_squared_error
 
 Clustering metrics
 ------------------
@@ -561,6 +647,7 @@ See the :ref:`clustering` section of the user guide for further details.
    :template: function.rst
 
    metrics.adjusted_rand_score
+   metrics.adjusted_mutual_info_score
    metrics.homogeneity_completeness_v_measure
    metrics.homogeneity_score
    metrics.completeness_score
@@ -613,6 +700,39 @@ Pairwise metrics
    mixture.VBGMM
 
 
+.. _multiclass_ref:
+
+:mod:`sklearn.multiclass`: Multiclass and multilabel classification
+===================================================================
+
+.. automodule:: sklearn.multiclass
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`multiclass` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+    :toctree: generated
+    :template: class.rst
+
+    multiclass.OneVsRestClassifier
+    multiclass.OneVsOneClassifier
+    multiclass.OutputCodeClassifier
+
+.. autosummary::
+    :toctree: generated
+    :template: function.rst
+
+    multiclass.fit_ovr
+    multiclass.predict_ovr
+    multiclass.fit_ovo
+    multiclass.predict_ovo
+    multiclass.fit_ecoc
+    multiclass.predict_ecoc
+
+
 .. _naive_bayes_ref:
 
 :mod:`sklearn.naive_bayes`: Naive Bayes
@@ -622,7 +742,7 @@ Pairwise metrics
    :no-members:
    :no-inherited-members:
 
-**User guide:** See the :ref:`naive_bayers` section for further details.
+**User guide:** See the :ref:`naive_bayes` section for further details.
 
 .. currentmodule:: sklearn
 
@@ -655,10 +775,8 @@ Pairwise metrics
    neighbors.NearestNeighbors
    neighbors.KNeighborsClassifier
    neighbors.RadiusNeighborsClassifier
-   neighbors.NeighborsClassifier
    neighbors.KNeighborsRegressor
    neighbors.RadiusNeighborsRegressor
-   neighbors.NeighborsRegressor
    neighbors.BallTree
 
 .. autosummary::
@@ -742,6 +860,23 @@ Pairwise metrics
    preprocessing.binarize
 
 
+:mod:`sklearn.qda`: Quadratic Discriminant Analysis
+===================================================
+
+.. automodule:: sklearn.qda
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`lda_qda` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated
+   :template: class.rst
+
+   qda.QDA
+
 .. _svm_ref:
 
 :mod:`sklearn.svm`: Support Vector Machines
@@ -753,8 +888,8 @@ Pairwise metrics
 
 **User guide:** See the :ref:`svm` section for further details.
 
-For dense data
---------------
+Estimators
+----------
 
 .. currentmodule:: sklearn
 
@@ -774,26 +909,6 @@ For dense data
    :template: function.rst
 
    svm.l1_min_c
-
-For sparse data
----------------
-
-.. automodule:: sklearn.svm.sparse
-   :no-members:
-   :no-inherited-members:
-
-.. currentmodule:: sklearn
-
-.. autosummary::
-   :toctree: generated/
-   :template: class.rst
-
-   svm.sparse.SVC
-   svm.sparse.NuSVC
-   svm.sparse.SVR
-   svm.sparse.NuSVR
-   svm.sparse.OneClassSVM
-   svm.sparse.LinearSVC
 
 Low-level methods
 -----------------
@@ -846,6 +961,8 @@ Low-level methods
 .. automodule:: sklearn.utils
    :no-members:
    :no-inherited-members:
+
+**Developer guide:** See the :ref:`developers-utils` page for further details.
 
 .. currentmodule:: sklearn
 
