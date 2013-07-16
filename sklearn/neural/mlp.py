@@ -1,4 +1,5 @@
 # Author: Lars Buitinck <L.J.Buitinck@uva.nl>
+# Author: James Bergstra
 
 import numpy as np
 
@@ -6,8 +7,6 @@ from ..base import BaseEstimator, ClassifierMixin
 from ..preprocessing import LabelBinarizer
 from ..utils import atleast2d_or_csr, check_random_state
 from ..utils.extmath import logsumexp, safe_sparse_dot
-
-from .backprop_sgd import backprop_sgd
 
 
 def logistic(x):
@@ -70,11 +69,26 @@ class MLPSGD(object):
         self.shuffle = shuffle
 
     def fit_model(self, mlp, X, Y):
-        raise NotImplementedError()
-        
+        NX, DX = X.shape
+        NY, = Y.shape
+        assert NX == NY, (NX, NY)
+        for epoch in range(2000):
+            losses = []
+            for ii in range(0, len(X), self.batch_size):
+                #print '-' * 80
+                #print 'ii', ii, self.learning_rate
+                Xii = X[ii:ii + self.batch_size]
+                Yii = Y[ii:ii + self.batch_size]
+                gparams = mlp.params_.zeros_like()
+                loss = mlp.decision_function_grad(Xii, Yii, gparams,
+                        pcoef=0.0, gcoef=1.0)
+                mlp.params_.params -= self.learning_rate * gparams.params
+                losses.append(loss)
+            print np.mean(losses)
+
 
 class MLPParams(object):
-    def __init__(self, n_features, n_hidden, n_targets):
+    def __init__(self, n_features, n_hidden, n_targets, dtype='float'):
         self.n_features = n_features
         self.n_hidden = n_hidden
         self.n_targets = n_targets
@@ -83,11 +97,23 @@ class MLPParams(object):
                         (n_hidden,),
                         (n_targets,)]
 
-        self.params = np.zeros(sum(map(np.prod, param_shapes)), dtype=self.dtype)
+        self.params = np.zeros(sum(map(np.prod, param_shapes)), dtype=dtype)
         self.views = []
         offset = 0
         for shape in param_shapes:
             self.views.append(self.params[offset:offset + np.prod(shape)].reshape(shape))
+            offset += np.prod(shape)
+
+    def __str__(self):
+        return "w: %s\nb: %s\nv: %s\nc:%s" % (
+                self.coef_hidden,
+                self.intercept_hidden,
+                self.coef_output,
+                self.intercept_output)
+
+    def zeros_like(self):
+        return MLPParams(self.n_features, self.n_hidden, self.n_targets,
+                dtype=self.params.dtype)
 
     @property
     def coef_hidden(self):
@@ -95,7 +121,7 @@ class MLPParams(object):
 
     @coef_hidden.setter
     def coef_hidden(self, value):
-        self.views0][:] = value
+        self.views[0][:] = value
 
     @property
     def coef_output(self):
@@ -103,7 +129,7 @@ class MLPParams(object):
 
     @coef_output.setter
     def coef_output(self, value):
-        self.views1][:] = value
+        self.views[1][:] = value
 
     @property
     def intercept_hidden(self):
@@ -111,7 +137,7 @@ class MLPParams(object):
 
     @intercept_hidden.setter
     def intercept_hidden(self, value):
-        self.views2][:] = value
+        self.views[2][:] = value
 
     @property
     def intercept_output(self):
@@ -119,7 +145,7 @@ class MLPParams(object):
 
     @intercept_output.setter
     def intercept_output(self, value):
-        self.views3][:] = value
+        self.views[3][:] = value
 
 
 class MLPClassifier(BaseEstimator, ClassifierMixin):
@@ -161,28 +187,26 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
         rng = self.random_state
 
         if self.iscale is None:
-            # -- Default advocated by Glorot and Bengio, 2010 
+            # -- Default advocated by Glorot and Bengio, 2010
             iscale = 6. / np.sqrt(self.n_hidden + n_features)
         else:
             iscale = self.iscale
-        self.params_ = MLPParams(self.n_features, n_features, self.n_targets)
+        self.params_ = MLPParams(n_features, n_hidden, n_targets)
 
         self.params_.coef_hidden = rng.uniform(-1, 1, (n_hidden, n_features)) * iscale
-        self.params_.coef_output = rng.uniform(-1, 1, (n_targets, n_hidden))
+        self.params_.coef_output = np.zeros((n_targets, n_hidden))
 
-        self.params_.intercept_hidden = rng.uniform(-1, 1, n_hidden)
-        self.params_.intercept_output = rng.uniform(-1, 1, n_targets)
-
+        self.params_.intercept_hidden = np.zeros(n_hidden)
+        self.params_.intercept_output = np.zeros(n_targets)
 
     def fit(self, X, y):
         X = atleast2d_or_csr(X, dtype=np.float64, order="C")
+        y = np.asarray(y)
         _, n_features = X.shape
+        n_targets = np.max(y) + 1
 
-        self._lbin = LabelBinarizer()
-        Y = self._lbin.fit_transform(y)
-
-        self._init_fit(n_features, Y.shape[1])
-        self.algo.fit_model(self, X, Y)
+        self._init_fit(n_features, n_targets)
+        self.algo.fit_model(self, X, y)
 
         return self
 
@@ -211,21 +235,21 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
     def decision_function(self, X):
         X = atleast2d_or_csr(X)
         z_hidden = (safe_sparse_dot(X, self.params_.coef_hidden.T) +
-                    self.params.intercept_hidden)
+                    self.params_.intercept_hidden)
         y_hidden = logistic(z_hidden) if self.activation == "logistic" \
                                       else _tanh(z_hidden)
         y_output = (np.dot(y_hidden, self.params_.coef_output.T) +
-                    self.params.intercept_output)
-        if y_output.shape[1] == 1:
-            y_output = y_output.ravel()
+                    self.params_.intercept_output)
+        print  X
+        print y_output
         return y_output
 
-    def decision_function_grad(self, X, Y, gparams=None, pcoef, gcoef):
+    def decision_function_grad(self, X, Y, gparams, pcoef, gcoef):
         """
         if gparams is None it uses self.params
         """
         X = atleast2d_or_csr(X)
-        z_hidden = (safe_sparse_dot(X, self.params.coef_hidden.T) +
+        z_hidden = (safe_sparse_dot(X, self.params_.coef_hidden.T) +
                     self.params_.intercept_hidden)
         y_hidden = logistic(z_hidden) if self.activation == "logistic" \
                                       else _tanh(z_hidden)
@@ -233,12 +257,12 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
                     self.params_.intercept_output)
 
         # -- make sure this next bit gets into Cython or numba or something
-        max_out = np.max(y_output)
-        p_output = np.exp(y_output - max_out)
-        p_output /= p_output.sum()
-        loss = np.log(p_output) # -- XXX use pre-softmax value for acc.
+        max_out = np.max(y_output, axis=1)
+        p_output = np.exp(y_output - max_out[:, None])
+        p_output /= p_output.sum(axis=1)[:, None]
         g_p_output = p_output.copy()
-        g_p_output[range(len), Y] -= 1
+        g_p_output[range(len(Y)), Y] -= 1.0
+        loss = -np.log(p_output[range(len(Y)), Y]) # -- XXX use pre-softmax value for acc.
 
         g_hid_out = np.dot(g_p_output, self.params_.coef_output)
         if self.activation == 'logistic':
@@ -246,15 +270,17 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
         else:
             g_hid_in = g_hid_out * (1 - z_hidden ** 2)
 
-        if gparams is None:
-            gparams = self.params_
+        if pcoef:
+            gparams.params[:] = self.params_.params * pcoef
+        else:
+            gparams.params[:] = 0
 
-        gparams[3] = np.mean(g_p_output, axis=1)
-        gparams[2] = np.mean(g_hid_in, axis=1)
-        gparams[1] = np.dot(g_p_output, g_hid_out)
-        gparams[0] = np.dot(g_hid_in, X)
+        gparams.intercept_output += gcoef * np.mean(g_p_output, axis=0)
+        gparams.intercept_hidden += gcoef * np.mean(g_hid_in, axis=0)
+        gparams.coef_output += gcoef * np.dot(g_p_output.T, z_hidden)
+        gparams.coef_hidden += gcoef * np.dot(g_hid_in.T, X)
 
-        return gparams
+        return loss
 
     def predict(self, X):
         scores = self.decision_function(X)
@@ -280,5 +306,5 @@ class MLPClassifier(BaseEstimator, ClassifierMixin):
 
     @property
     def classes_(self):
-        return self._lbin.classes_
+        return np.arange(self.params_.n_targets)
 
